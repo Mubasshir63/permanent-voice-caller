@@ -1,5 +1,6 @@
-pipecat-ai[aiohttp,groq,sip]
-aiohttp
-requests
+daily-python>=0.4.0
 fastapi
 uvicorn
+requests
+aiohttp
+groq
