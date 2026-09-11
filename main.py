@@ -4,76 +4,102 @@ import aiohttp
 import requests
 import uvicorn
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 from groq import Groq
 
-# 1. Initialize API configurations safely from environment keys
 app = FastAPI()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
 
-# Keep track of active session conversations natively
 chat_history = [
-    {"role": "system", "content": "You are a professional, polite phone receptionist. Speak in maximum 1-2 short sentences."}
+    {"role": "system", "content": "You are a professional, polite business receptionist. Speak in maximum 1-2 short sentences."}
 ]
 
-@app.get("/")
+# 1. Free Interactive Browser Testing Interface
+@app.get("/", response_class=HTMLResponse)
 def read_root():
-    return {"status": "AI Voice Receptor Endpoint Live & Ready"}
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>AI Tester Console</title>
+        <style>
+            body { font-family: sans-serif; background: #121212; color: #fff; max-width: 600px; margin: 40px auto; padding: 20px; }
+            #chatbox { height: 300px; border: 1px solid #333; padding: 10px; overflow-y: scroll; background: #1e1e1e; border-radius: 8px; margin-bottom: 10px; }
+            .user { color: #4af; font-weight: bold; }
+            .ai { color: #af4; font-weight: bold; }
+            input, button { padding: 10px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; }
+            input { width: 70%; }
+            #hangup { background: #d32f2f; cursor: pointer; float: right; }
+        </style>
+    </head>
+    <body>
+        <h2>🤖 Free AI Voice Agent Test Console</h2>
+        <div id="chatbox"></div>
+        <input type="text" id="userInput" placeholder="Type what you would say on the phone...">
+        <button onclick="sendMessage()">Send Speech</button>
+        <button id="hangup" onclick="hangupCall()">End Session</button>
 
-# 2. Handles Incoming Text Stream via SIP Webhook Routing
+        <script>
+            async sendMessage() {
+                let input = document.getElementById('userInput');
+                let box = document.getElementById('chatbox');
+                if(!input.value) return;
+                
+                box.innerHTML += "<p><span class='user'>YOU:</span> " + input.value + "</p>";
+                
+                let res = await fetch('/sip-incoming', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({speech_text: input.value})
+                });
+                let data = await res.json();
+                box.innerHTML += "<p><span class='ai'>AI:</span> " + data.response + "</p>";
+                input.value = '';
+                box.scrollTop = box.scrollHeight;
+            }
+
+            async hangupCall() {
+                await fetch('/sip-hangup', {method: 'POST'});
+                alert('Call ended! Data sent to n8n. Console reset.');
+                document.getElementById('chatbox').innerHTML = '';
+            }
+        </script>
+    </body>
+    </html>
+    """
+
 @app.post("/sip-incoming")
 async def handle_sip_audio(payload: dict):
     global chat_history
-    
-    # Extract caller's speech string passed by your SIP layer
     caller_speech = payload.get("speech_text", "")
     if not caller_speech:
         return {"response": ""}
-        
-    # Append input speech onto conversation log
     chat_history.append({"role": "user", "content": caller_speech})
-    
     try:
-        # Core Free-Tier Processing Layer via Groq Direct Client SDK
         client = Groq(api_key=GROQ_API_KEY)
         completion = client.chat.completions.create(
             model="llama3-8b-8192",
             messages=chat_history,
             max_tokens=60
         )
-        
-        ai_response = completion.choices[0].message.content
+        ai_response = completion.choices.message.content
         chat_history.append({"role": "assistant", "content": ai_response})
         return {"response": ai_response}
-        
     except Exception as e:
-        print(f"Groq runtime process failed: {e}")
         return {"response": "Sorry, let me try processing that again."}
 
-# 3. Dispatches Clean Log to n8n Once the Call Finishes
 @app.post("/sip-hangup")
 async def end_sip_call():
     global chat_history
     if N8N_WEBHOOK_URL:
-        # Build a highly readable transcription string block
         formatted_transcript = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in chat_history])
-        
-        n8n_payload = {
-            "event": "call_completed",
-            "transcript": formatted_transcript,
-            "status": "completed"
-        }
-        try:
-            requests.post(N8N_WEBHOOK_URL, json=n8n_payload, timeout=5)
-            print("Transcript packet successfully pushed to n8n!")
-        except Exception as e:
-            print(f"Failed pushing payload to n8n: {e}")
-            
-    # Reset tracking state for next incoming caller connection
-    chat_history = [chat_history[0]]
+        n8n_payload = {"event": "call_completed", "transcript": formatted_transcript, "status": "completed"}
+        try: requests.post(N8N_WEBHOOK_URL, json=n8n_payload, timeout=5)
+        except Exception: pass
+    chat_history = [{"role": "system", "content": "You are a professional, polite business receptionist. Speak in maximum 1-2 short sentences."}]
     return {"status": "session_reset"}
 
 if __name__ == "__main__":
-    # Launch uvicorn web server natively mapped on Render container ports
     port = int(os.getenv("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
