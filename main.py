@@ -6,12 +6,12 @@ import uvicorn
 from fastapi import FastAPI
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.services.groq import GroqService
 from pipecat.services.google import GoogleService
 from pipecat.transports.network.sip_transport import SIPTransport
 
-# 1. Initialize FastAPI to satisfy Render's health checks
+# 1. Initialize FastAPI to satisfy Render's health check requirements
 app = FastAPI()
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
 
@@ -22,7 +22,7 @@ def read_root():
 # 2. Main Pipecat Voice Pipeline Engine
 async def run_voice_bot():
     async with aiohttp.ClientSession():
-        # Setup the permanent Free SIP digital phone line
+        # Setup the permanent Free SIP digital phone line configuration
         transport = SIPTransport(
             sip_username=os.getenv("SIP_USERNAME"),
             sip_password=os.getenv("SIP_PASSWORD"),
@@ -30,13 +30,13 @@ async def run_voice_bot():
             port=5060
         )
         
-        # Free Tier AI Processing via Groq & Google (Valid for Pipecat 1.0+)
+        # Universal AI Processing services via Groq & Google
         stt = GroqService(api_key=os.getenv("GROQ_API_KEY"), model="whisper-large-v3-turbo")
         llm = GroqService(api_key=os.getenv("GROQ_API_KEY"), model="llama3-8b-8192")
         tts = GoogleService(api_key=os.getenv("GOOGLE_API_KEY"))
 
-        # Instantiating the validated structural conversation context block
-        sys_context = OpenAILLMContext(
+        # Using the universal, platform-agnostic LLMContext manager
+        sys_context = LLMContext(
             messages=[{"role": "system", "content": "You are a professional phone assistant. Speak in short, concise sentences."}],
             tools=[]
         )
