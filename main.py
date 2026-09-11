@@ -6,12 +6,12 @@ import uvicorn
 from fastapi import FastAPI
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
-from pipecat.services.groq import GroqLLMService, GroqSTTService
-from pipecat.services.google import GoogleTTSService
+from pipecat.processors.aggregators.llm_response import OpenAILLMContext
+from pipecat.services.groq import GroqService
+from pipecat.services.google import GoogleService
 from pipecat.transports.network.sip_transport import SIPTransport
 
-# 1. Initialize FastAPI to keep Hugging Face Space active
+# 1. Initialize FastAPI to keep Render's health checks satisfied
 app = FastAPI()
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
 
@@ -30,10 +30,10 @@ async def run_voice_bot():
             port=5060
         )
         
-        # Free Tier AI Processing via Groq & Google
-        stt = GroqSTTService(api_key=os.getenv("GROQ_API_KEY"), model="whisper-large-v3-turbo")
-        llm = GroqLLMService(api_key=os.getenv("GROQ_API_KEY"), model="llama3-8b-8192")
-        tts = GoogleTTSService(api_key=os.getenv("GOOGLE_API_KEY"))
+        # Free Tier AI Processing via Groq & Google (Updated for Pipecat 1.9+)
+        stt = GroqService(api_key=os.getenv("GROQ_API_KEY"), model="whisper-large-v3-turbo")
+        llm = GroqService(api_key=os.getenv("GROQ_API_KEY"), model="llama3-8b-8192")
+        tts = GoogleService(api_key=os.getenv("GOOGLE_API_KEY"))
 
         sys_context = OpenAILLMContext(
             messages=[{"role": "system", "content": "You are a professional phone assistant. Speak in short, concise sentences."}],
@@ -77,6 +77,6 @@ if __name__ == "__main__":
     import threading
     threading.Thread(target=start_voice_loop, daemon=True).start()
     
-    # Run the web server on port 7860 for Hugging Face compatibility
-    port = int(os.getenv("PORT", 7860))
+    # Run the web server on port 8080 for Render Docker compatibility
+    port = int(os.getenv("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
