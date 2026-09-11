@@ -7,11 +7,12 @@ from fastapi import FastAPI
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.services.google import GoogleTTSService
 from pipecat.transports.network.sip_transport import SIPTransport
 
-# Import the direct services to prevent Pipecat submodule version conflicts
-from pipecat.services.openai import OpenAILLMService, OpenAISTTService
+# Explicitly correct submodule imports matching Pipecat 1.9.0+
+from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.openai.stt import OpenAISTTService
+from pipecat.services.google.tts import GoogleTTSService
 
 # 1. Initialize FastAPI to pass Render's internal health check ping
 app = FastAPI()
@@ -32,7 +33,7 @@ async def run_voice_bot():
             port=5060
         )
         
-        # Groq uses the exact same API format as OpenAI. We can route Groq through the stable OpenAI service layout:
+        # Route Groq securely through the stable OpenAI service structures
         stt = OpenAISTTService(
             api_key=os.getenv("GROQ_API_KEY"),
             base_url="https://groq.com",
@@ -43,6 +44,7 @@ async def run_voice_bot():
             base_url="https://groq.com",
             model="llama3-8b-8192"
         )
+        # Correctly imported Google TTS service initialization
         tts = GoogleTTSService(api_key=os.getenv("GOOGLE_API_KEY"))
 
         # Setup the universal conversational context block manager
@@ -77,14 +79,12 @@ async def run_voice_bot():
             except Exception as e:
                 print(f"n8n webhook failed: {e}")
 
-# Function to run the voice loop in the background of the web server
 def start_voice_loop():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(run_voice_bot())
 
 if __name__ == "__main__":
-    # Start the background voice pipeline thread
     import threading
     threading.Thread(target=start_voice_loop, daemon=True).start()
     
