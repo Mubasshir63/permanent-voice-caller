@@ -1,0 +1,3 @@
+pipecat-ai[aiohttp,groq,sip]
+aiohttp
+requests
