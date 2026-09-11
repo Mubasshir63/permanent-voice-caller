@@ -15,7 +15,7 @@ chat_history = [
     {"role": "system", "content": "You are a professional, polite business receptionist. Speak in maximum 1-2 short sentences."}
 ]
 
-# 1. Free Interactive Browser Testing Interface
+# 1. Free Interactive Browser Testing Interface (Fixed JS Syntax)
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """
@@ -37,33 +37,41 @@ def read_root():
         <h2>🤖 Free AI Voice Agent Test Console</h2>
         <div id="chatbox"></div>
         <input type="text" id="userInput" placeholder="Type what you would say on the phone...">
-        <button onclick="sendMessage()">Send Speech</button>
-        <button id="hangup" onclick="hangupCall()">End Session</button>
+        <button id="sendBtn">Send Speech</button>
+        <button id="hangup">End Session</button>
 
         <script>
-            async sendMessage() {
-                let input = document.getElementById('userInput');
-                let box = document.getElementById('chatbox');
+            // Bulletproof standard Event Listeners to ensure buttons never freeze
+            document.getElementById('sendBtn').addEventListener('click', function() {
+                var input = document.getElementById('userInput');
+                var box = document.getElementById('chatbox');
                 if(!input.value) return;
                 
                 box.innerHTML += "<p><span class='user'>YOU:</span> " + input.value + "</p>";
                 
-                let res = await fetch('/sip-incoming', {
+                fetch('/sip-incoming', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({speech_text: input.value})
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    box.innerHTML += "<p><span class='ai'>AI:</span> " + data.response + "</p>";
+                    input.value = '';
+                    box.scrollTop = box.scrollHeight;
+                })
+                .catch(function(err) {
+                    box.innerHTML += "<p style='color:red;'>Error connecting to server</p>";
                 });
-                let data = await res.json();
-                box.innerHTML += "<p><span class='ai'>AI:</span> " + data.response + "</p>";
-                input.value = '';
-                box.scrollTop = box.scrollHeight;
-            }
+            });
 
-            async hangupCall() {
-                await fetch('/sip-hangup', {method: 'POST'});
-                alert('Call ended! Data sent to n8n. Console reset.');
-                document.getElementById('chatbox').innerHTML = '';
-            }
+            document.getElementById('hangup').addEventListener('click', function() {
+                fetch('/sip-hangup', { method: 'POST' })
+                .then(function() {
+                    alert('Call ended! Data sent to n8n. Console reset.');
+                    document.getElementById('chatbox').innerHTML = '';
+                });
+            });
         </script>
     </body>
     </html>
